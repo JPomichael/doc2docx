@@ -3,6 +3,7 @@ from win32com import client as wc
 import win32api
 import time
 import glob
+from datetime import datetime
 
 #  注意：目录的格式必须写成双反斜杠
 path = ""
@@ -11,22 +12,13 @@ errs = []
 
 def writeFile(_txt):
     txt= open(os.path.join(os.getcwd(),'log.txt'),'a',encoding='UTF-8')   # 创建文件，权限为写入
+    _txt=datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]+" "+_txt
     print(_txt)
     txt.write(_txt +'\n')
-
 
 def takeErrs(_f):
     if _f not in errs:
         errs.append(_f)
-
-# def readInfo(_dir):
-#     for entry in os.scandir(_dir):
-#         if entry.is_file() and not entry.endswith('.docx') and entry.endswith('.doc') and not os.path.basename(entry).startswith('~$'):
-#             print('')
-#         else:
-#             readInfo(entry.path)    
-#     name = os.listdir(_dir)         # os.listdir方法返回一个列表对象
-#     return name
 
 def convertDocx(_files):
     n=0;
@@ -40,7 +32,7 @@ def convertDocx(_files):
                     word.Visible = 0
                     word.DisplayAlerts = 0
                     #print("正在转换：[{0}/{1}] ".format(n+1,len(_files))+ file+" => "+new_file_path)
-                    writeFile("正在转换：[{0}/{1}] ".format(n+1,len(_files))+ file+" => "+new_file_path)
+                    writeFile("正在转换：[{}/{}] ".format(n+1,len(_files))+ file+" => "+new_file_path)
                     # 打开文件
                     doc = word.Documents.Open(file)
                     time.sleep(0.5)
@@ -51,50 +43,43 @@ def convertDocx(_files):
                     # 在files数组中删除第一个文件地址（已处理的文件地址）
                     del _files[_files.index(file)]
                 except:
-                    writeFile("转换失败：" + file)
+                    writeFile("\033[1;31m 转换失败：{}\033[0m".format(file))
                     takeErrs(file)
                 finally:                                                            
                     try:
                         doc.Close()
                         word.Quit()
                     except:
-                        writeFile("未知错误：" + file)
+                        writeFile("\033[1;31m 未知错误：{}\033[0m".format(file))
                         takeErrs(file)                  
                     time.sleep(0.5)
         else:
-            writeFile("跳过转换：[{0}/{1}]".format(n+1,len(_files))+ file)
+            writeFile("\033[1;38m 跳过转换：[{}/{}]\033[0m".format(n+1,len(_files))+ file)
         n=n+1;               
     writeFile("队列完成")    
 
-# 程序入口
-if __name__ == "__main__":
+def exec():
     path=input("请输入目录：").replace(r'\\',r'')
     while not os.path.isdir(path) or not os.path.exists(path):
-        writeFile("目录不合法：{0}".format(path))
+        writeFile("\033[1;31m 目录不合法：{}\033[0m".format(path))
         path=input("请输入目录：").replace(r'\\',r'')
+    writeFile("指定目录：{}".format(path))
+    
     path = path+'/**/*.doc'
     for file in glob.glob(path,recursive = True):
         if not file.endswith('.docx') and file.endswith('.doc') and not os.path.basename(file).startswith('~$'): 
             files.append(file)
-    # for root,dirs,names in os.walk(path):
-    #     for d in dirs:
-    #         _dir=os.path.join(root,d)
-    #         #print(_dir)
-    #         _dir2=_dir.replace(os.path.dirname(_dir)+'\\','')
-    #         if os.path.exists(_dir) and os.path.isdir(_dir) and _dir2!='err':
-    #             fileList = readInfo(_dir)       # 读取文件夹下所有的文件名，返回一个列表
-    #             for i in fileList:
-    #                 rowInfo = os.path.join(_dir,i)
-    #                 #rowInfo=os.path.abspath(_dir+'\\'+i)
-    #                 #print(rowInfo)
-    #                 files.append(rowInfo)
-    #     for f in names:
-    #         _f=os.path.join(root,f)
-    #         files.append(_f)
     writeFile("检索完成：{}".format(len(files)))
     
     if len(files)>0:
         convertDocx(files)
-    while len(errs)>0:
-        print("失败队列：{}".format(len(errs)))
+    err=0
+    while len(errs)>0 and err<=5:
+        err=err+1
+        print("失败队列{}：{}".format(err,len(errs)))
         convertDocx(errs)
+    exec()
+
+# 程序入口
+if __name__ == "__main__":
+    exec()
